@@ -21,3 +21,16 @@ test('La IA apunta usando impactos públicos sin consultar barcos',()=>{
   const b={shots:new Map([[30*60+30,true]])};const [x,y]=aiTarget(b,()=>0);assert.equal(Math.abs(x-30)+Math.abs(y-30),3);
   const empty={shots:new Map()};assert.deepEqual(aiTarget(empty,()=>0),[1,1]);
 });
+
+test('Modo rápido hunde al 25 % y no acumula daño después del hundimiento', async()=>{
+  const {damageLimit,isSunk}=await import('../engine.js');
+  const b=makeBoard(()=>0), s=b.ships[0];s.hits=damageLimit(s,.25)-1;
+  const r=shoot(b,s.x+1,s.y+1,()=>0,.25);assert.deepEqual(r.sunk,[s.name]);assert(isSunk(s,.25));assert.equal(s.hits,damageLimit(s,.25));
+  shoot(b,s.x+5,s.y+1,()=>0,.25);assert.equal(s.hits,damageLimit(s,.25));
+});
+test('El límite compara barcos hundidos, luego daño y permite empate',async()=>{
+  const {roundWinner,damageLimit}=await import('../engine.js');const b=[makeBoard(()=>0),makeBoard(()=>0)];
+  assert.equal(roundWinner(b,.25),null);b[1].ships[0].hits=5;assert.equal(roundWinner(b,.25),0);
+  b[0].ships[3].hits=damageLimit(b[0].ships[3],.25);assert.equal(roundWinner(b,.25),1);
+  b[1].ships[3].hits=damageLimit(b[1].ships[3],.25);assert.equal(roundWinner(b,.25),0);
+});

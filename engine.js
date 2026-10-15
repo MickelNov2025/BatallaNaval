@@ -21,7 +21,22 @@ export const makeBoard = (random = Math.random) => ({ ships: makeFleet(random), 
 export function shipAt(board, x, y) {
   return board.ships.find(s => x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h);
 }
-export function shoot(board, x, y, random = Math.random) {
+export const RULES = {
+  quick: { threshold: .25, salvo: 3, rounds: 20 },
+  classic: { threshold: 1, salvo: 1, rounds: Infinity }
+};
+export const damageLimit = (ship, threshold = 1) => Math.ceil(ship.w * ship.h * threshold);
+export const isSunk = (ship, threshold = 1) => ship.hits >= damageLimit(ship, threshold);
+export function score(board, threshold) {
+  return { sunk: board.ships.filter(s => isSunk(s, threshold)).length,
+    damage: board.ships.reduce((n,s) => n + s.hits, 0) };
+}
+// Return the attacking player's index; null is an exact draw.
+export function roundWinner(boards, threshold) {
+  const a = score(boards[1], threshold), b = score(boards[0], threshold);
+  return a.sunk !== b.sunk ? (a.sunk > b.sunk ? 0 : 1) : a.damage !== b.damage ? (a.damage > b.damage ? 0 : 1) : null;
+}
+export function shoot(board, x, y, random = Math.random, threshold = 1) {
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= SIZE || y >= SIZE) throw Error('Coordenada inválida');
   const drift = random() >= .65;
   let dx = 0, dy = 0;
@@ -41,13 +56,13 @@ export function shoot(board, x, y, random = Math.random) {
     fresh++;
     const ship = shipAt(board, xx, yy);
     board.shots.set(key, !!ship);
-    if (ship) {
+    if (ship && !isSunk(ship, threshold)) {
       hits++; ship.hits++;
-      if (ship.hits === ship.w * ship.h) sunk.push(ship.name);
+      if (isSunk(ship, threshold)) sunk.push(ship.name);
     }
   }
   return { x, y, cx, cy, cells, hits, fresh, sunk, shifted: cx !== x || cy !== y,
-    won: board.ships.every(s => s.hits === s.w * s.h) };
+    won: board.ships.every(s => isSunk(s, threshold)) };
 }
 export function aiTarget(board, random = Math.random) {
   // Only inspect public impact information, never hidden ship coordinates.
